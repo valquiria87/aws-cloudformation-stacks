@@ -6,6 +6,48 @@ Este projeto transforma exemplos introdutórios em templates parametrizados e re
 
 **Tecnologias:** AWS CloudFormation · YAML · Amazon EC2 · Amazon Linux 2023 · Ubuntu 24.04 LTS · Security Groups · AWS Systems Manager Parameter Store · IAM · Amazon S3
 
+## AWS CloudFormation: conceito e funcionamento
+
+O **AWS CloudFormation** é um serviço nativo da AWS para infraestrutura como código (IaC). A infraestrutura desejada é descrita em um template; ao enviar esse template, o CloudFormation provisiona e organiza os recursos em uma unidade gerenciável chamada **stack**.
+
+O template funciona como uma especificação declarativa: descreve quais recursos devem existir e suas configurações, enquanto o CloudFormation determina a ordem de criação com base nas dependências entre eles. A stack também pode ser atualizada ou excluída como um conjunto.
+
+### Benefícios do CloudFormation
+
+- **Automação:** reduz a necessidade de criar recursos manualmente pelo console.
+- **Padronização:** permite utilizar a mesma definição de infraestrutura em diferentes ambientes.
+- **Reutilização:** parâmetros possibilitam adaptar um template sem reescrever sua estrutura.
+- **Rastreabilidade:** templates podem ser versionados no GitHub e revisados como código.
+- **Gerenciamento centralizado:** recursos relacionados são acompanhados como uma stack.
+- **Controle de mudanças:** change sets permitem visualizar alterações propostas antes de aplicá-las.
+- **Tratamento de falhas:** o serviço acompanha eventos da stack e pode executar rollback conforme as configurações e o tipo de operação.
+
+### Formatos dos templates: JSON e YAML
+
+O CloudFormation aceita templates nos formatos **JSON** e **YAML**. Ambos descrevem os mesmos elementos principais, como `Resources`, `Parameters`, `Outputs`, `Mappings` e `Conditions`.
+
+- **JSON:** formato estruturado por objetos e arrays; é explícito e amplamente utilizado por ferramentas.
+- **YAML:** formato mais compacto e legível para edição manual, com indentação e menos caracteres estruturais.
+
+Neste repositório foi escolhido **YAML** para facilitar a leitura, a revisão e a manutenção dos exemplos. A escolha do formato não altera os recursos que podem ser definidos pelo CloudFormation.
+
+### CloudFormation x Terraform
+
+CloudFormation e Terraform são ferramentas de infraestrutura como código, mas possuem diferenças importantes.
+
+| Critério | AWS CloudFormation | Terraform |
+|---|---|---|
+| Desenvolvedor | Amazon Web Services | HashiCorp |
+| Foco | Serviços e recursos da AWS | Múltiplos provedores, incluindo AWS, Azure e Google Cloud |
+| Linguagem | Templates JSON ou YAML | HCL (HashiCorp Configuration Language) |
+| Integração com AWS | Serviço nativo da AWS | Integração por meio do provider AWS |
+| Estado da infraestrutura | Gerenciado pelo próprio serviço CloudFormation e pelas stacks | Mantém um arquivo de estado (state), local ou remoto |
+| Organização | Stacks e recursos relacionados | Configurações, módulos e workspaces |
+| Planejamento de mudanças | Change sets | Comando `terraform plan` |
+| Aplicação | Operações de criação e atualização da stack | Comando `terraform apply` |
+
+**Em resumo:** CloudFormation é uma opção natural quando a infraestrutura será gerenciada dentro do ecossistema AWS, com integração nativa aos serviços da plataforma. Terraform é especialmente útil quando se deseja trabalhar com vários provedores de nuvem ou manter uma abordagem consistente de IaC entre diferentes plataformas. A escolha depende do ambiente, da equipe e dos requisitos do projeto.
+
 ## Visão geral da arquitetura
 
 A sequência didática evolui da criação de uma instância para a configuração de um servidor web. O quarto template é uma stack independente que reúne EC2, IAM e S3.

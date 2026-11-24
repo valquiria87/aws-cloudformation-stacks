@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Cria uma instância EC2 Amazon Linux 2023 em uma subnet selecionada.
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: Selecione a VPC onde a instância será criada.
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Selecione uma subnet pertencente à VPC informada.
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues: [t2.micro, t3.micro]
+    Description: Tipo da instância EC2.
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+    Description: AMI Amazon Linux 2023 mais recente disponível na região.
+
+Resources:
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Grupo sem regras de entrada para a instância EC2 básica.
+      VpcId: !Ref VpcId
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType: !Ref InstanceType
+      SubnetId: !Ref SubnetId
+      SecurityGroupIds:
+        - !Ref EC2SecurityGroup
+      Tags:
+        - Key: Name
+          Value: EC2-CloudFormation
+
+Outputs:
+  InstanceId:
+    Description: ID da instância criada.
+    Value: !Ref EC2Instance
+  PrivateIp:
+    Description: Endereço IPv4 privado da instância.
+    Value: !GetAtt EC2Instance.PrivateIp
+  SecurityGroupId:
+    Description: ID do grupo de segurança sem regras de entrada.
+    Value: !Ref EC2SecurityGroup

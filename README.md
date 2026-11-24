@@ -1,16 +1,33 @@
-# AWS CloudFormation — EC2, Apache, Firewall, IAM e S3
+# AWS CloudFormation | Infraestrutura como Código na AWS
 
-Projeto desenvolvido como desafio prático de AWS CloudFormation da formação DIO. O repositório reúne quatro templates YAML em uma sequência de aprendizagem: criação de uma instância EC2, instalação do Apache, configuração de regras de firewall e composição de recursos EC2, IAM e S3 em uma única stack.
+> **Projeto prático de Infrastructure as Code (IaC):** quatro templates CloudFormation em YAML para provisionar e configurar recursos de computação, rede, identidade e armazenamento na AWS.
 
-## Objetivo
+Este projeto transforma exemplos introdutórios em templates parametrizados e reutilizáveis. Além de construir as stacks, o trabalho envolveu revisar configurações originais, identificar dependências de ambiente e aplicar melhorias de segurança e manutenção.
 
-Demonstrar como descrever infraestrutura como código (IaC) usando AWS CloudFormation, parametrizar recursos para reutilização e corrigir configurações que poderiam impedir a implantação ou expor serviços desnecessariamente.
+**Tecnologias:** AWS CloudFormation · YAML · Amazon EC2 · Amazon Linux 2023 · Ubuntu 24.04 LTS · Security Groups · AWS Systems Manager Parameter Store · IAM · Amazon S3
 
-## O que é AWS CloudFormation?
+## Visão geral da arquitetura
 
-AWS CloudFormation é um serviço de infraestrutura como código da AWS. Com ele, os recursos são declarados em templates JSON ou YAML e provisionados como uma unidade chamada **stack**. O CloudFormation interpreta o template, cria os recursos na ordem necessária, acompanha o estado da operação e permite atualizar ou excluir a infraestrutura de forma controlada.
+A sequência didática evolui da criação de uma instância para a configuração de um servidor web. O quarto template é uma stack independente que reúne EC2, IAM e S3.
 
-Em vez de configurar cada recurso manualmente, o template registra a configuração desejada e pode ser reutilizado em diferentes ambientes, com parâmetros apropriados.
+```mermaid
+flowchart TD
+    A["01 · EC2<br/>Instância + Security Group"] --> B["02 · Apache<br/>UserData + httpd"]
+    B --> C["03 · Firewall<br/>HTTP TCP/80 + acesso web"]
+    D["04 · Stack integrada"] --> E["Amazon EC2<br/>Ubuntu 24.04"]
+    D --> F["AWS IAM<br/>Grupo + usuário"]
+    D --> G["Amazon S3<br/>Bucket privado + criptografia"]
+```
+
+## Objetivos técnicos
+
+- Declarar infraestrutura como código usando templates YAML.
+- Criar e organizar recursos em stacks do CloudFormation.
+- Parametrizar VPC, subnet, tipo de instância e outros valores de implantação.
+- Automatizar a configuração de uma instância com `UserData`.
+- Controlar o tráfego de rede com Security Groups.
+- Integrar recursos EC2, IAM e S3 em um mesmo template.
+- Revisar configurações frágeis e documentar decisões técnicas e pré-requisitos.
 
 ## Estrutura do repositório
 
@@ -26,94 +43,117 @@ aws-cloudformation-stacks/
     └── analise-dos-templates.md
 ```
 
-## Templates do projeto
+## Templates
 
-| Template | Recursos | O que demonstra |
+| Template | Recursos principais | Finalidade |
 |---|---|---|
-| [01-ec2.yaml](templates/01-ec2.yaml) | EC2 + Security Group | Provisionamento de uma instância básica |
-| [02-apache.yaml](templates/02-apache.yaml) | EC2 + UserData + Apache | Instalação e inicialização automática do servidor web |
-| [03-firewall.yaml](templates/03-firewall.yaml) | EC2 + Apache + Security Group | Liberação de HTTP pela porta 80 |
-| [04-ec2-iam-s3.yaml](templates/04-ec2-iam-s3.yaml) | EC2 + Security Group + IAM + S3 | Composição de recursos de diferentes serviços em uma stack |
+| [01-ec2.yaml](templates/01-ec2.yaml) | EC2 + Security Group | Provisionar uma instância básica |
+| [02-apache.yaml](templates/02-apache.yaml) | EC2 + UserData + Apache | Instalar e iniciar um servidor web |
+| [03-firewall.yaml](templates/03-firewall.yaml) | EC2 + Apache + Security Group | Permitir acesso HTTP pela porta 80 |
+| [04-ec2-iam-s3.yaml](templates/04-ec2-iam-s3.yaml) | EC2 + IAM + S3 | Integrar computação, identidade e armazenamento |
 
-### 1. Criando uma instância EC2
+### 01 — Provisionamento de EC2
 
-O primeiro template cria uma instância Amazon Linux 2023 em uma subnet selecionada. A AMI é resolvida por um parâmetro público do AWS Systems Manager Parameter Store, evitando manter um ID de imagem fixo no arquivo.
+Cria uma instância Amazon Linux 2023 em uma subnet selecionada. A AMI é obtida por meio de um parâmetro público do AWS Systems Manager Parameter Store, evitando manter um ID de imagem fixo no template.
 
-O Security Group não possui regras de entrada. Portanto, a instância é criada sem exposição de portas de entrada.
+O Security Group não define regras de entrada nesta etapa. A VPC, a subnet e o tipo de instância são informados por parâmetros.
 
-### 2. Instalando o Apache
+### 02 — Configuração automática do Apache
 
-O segundo template utiliza a propriedade `UserData` para executar comandos durante a inicialização da instância. O script atualiza os pacotes, instala o Apache (`httpd`), habilita o serviço e grava uma página HTML simples.
+Utiliza `UserData` para executar comandos na inicialização da instância: atualizar pacotes, instalar o Apache (`httpd`), habilitar e iniciar o serviço e criar uma página HTML de demonstração.
 
-Nesta etapa, não há regra de entrada HTTP. A instalação do serviço é demonstrada separadamente da liberação de rede, que aparece no template seguinte.
+A instalação do serviço é mantida separada da liberação de tráfego HTTP, que é introduzida no template seguinte.
 
-### 3. Criando uma stack de Firewall
+### 03 — Regras de Firewall e acesso HTTP
 
-O terceiro template cria um Security Group associado à instância EC2 e permite tráfego TCP na porta 80. O servidor Apache é instalado por `UserData`.
+Adiciona uma regra de entrada TCP na porta 80 ao Security Group associado à instância. O Apache é instalado automaticamente por `UserData`.
 
-A regra de entrada HTTP utiliza `0.0.0.0/0`, permitindo acesso público ao site. Isso é intencional para a demonstração de um servidor web público. Em ambientes reais, avalie a necessidade de restringir a origem do tráfego e adote HTTPS quando aplicável.
+A origem `0.0.0.0/0` permite acesso HTTP público e é utilizada aqui para demonstrar a publicação de um servidor web. Para que o endereço de saída funcione, a subnet escolhida deve ser pública, possuir rota para um Internet Gateway e permitir o tráfego necessário.
 
-Para acessar o endereço exibido em `WebsiteURL`, selecione uma subnet pública com rota para um Internet Gateway e certifique-se de que a tabela de rotas e as Network ACLs não bloqueiem o tráfego.
+### 04 — Integração EC2, IAM e S3
 
-### 4. Integrando EC2, IAM e S3
+Reúne três áreas de serviços AWS em uma única stack:
 
-O quarto template reúne:
-- Uma instância EC2 com Ubuntu 24.04 LTS, cuja AMI é consultada no Parameter Store da Canonical.
-- Um Security Group que libera SSH somente para o CIDR informado no parâmetro `SSHLocation`.
-- Um bucket S3 com nome gerado pela AWS, bloqueio de acesso público e criptografia padrão.
-- Um grupo IAM e um usuário associado a esse grupo.
+- **EC2:** instância Ubuntu 24.04 LTS, com AMI consultada dinamicamente no Parameter Store da Canonical.
+- **IAM:** criação de um grupo e de um usuário associado a ele. Nenhuma política administrativa é concedida automaticamente.
+- **S3:** bucket com nome gerado pela AWS, bloqueio de acesso público e criptografia padrão.
 
-O usuário IAM e o grupo não recebem políticas de permissões neste exemplo. A criação de uma identidade não significa conceder acesso administrativo. As permissões devem ser definidas conforme o princípio do menor privilégio.
+O acesso SSH é limitado ao CIDR informado no parâmetro `SSHLocation`. A configuração recomendada para laboratório é informar o IP público autorizado com máscara `/32`.
 
-## Como criar stacks no AWS CloudFormation
+## Decisões técnicas e melhorias aplicadas
 
-1. Entre no Console de Gerenciamento da AWS e escolha a região desejada.
-2. Abra o serviço **CloudFormation**.
-3. Selecione **Create stack** e a opção para criar recursos com um template existente.
-4. Faça upload do arquivo YAML correspondente ao exercício.
-5. Informe um nome para a stack.
-6. Preencha os parâmetros solicitados pelo template.
-7. Revise as configurações e as permissões solicitadas.
-8. Na etapa de revisão, confirme a criação da stack.
-9. Acompanhe os eventos até o status de conclusão. Se houver falha, consulte os eventos da stack para identificar o recurso e a mensagem de erro.
+Os templates foram revisados para reduzir dependências de valores fixos e evitar configurações inseguras ou pouco reutilizáveis.
 
-### Parâmetros e pré-requisitos por template
+| Situação identificada nos exemplos | Ajuste aplicado |
+|---|---|
+| IDs de AMI fixos | Consulta dinâmica de AMIs por parâmetros públicos do SSM |
+| VPC específica da conta | VPC e subnet recebidas por parâmetros |
+| Nome de bucket S3 previamente definido | Nome gerado pela AWS |
+| Placeholder de Key Pair | Parâmetro tipado para selecionar um Key Pair existente |
+| SSH liberado para qualquer origem | CIDR de origem configurável e validado |
+| Comandos de instalação incompatíveis com Amazon Linux 2023 | Uso de `dnf` para instalar e iniciar o Apache |
+| Configuração de Security Group menos apropriada no exemplo de Firewall | Associação por `SecurityGroupIds` / configuração de interface de rede |
+
+Outras decisões importantes:
+
+- Os templates expõem valores úteis por meio de **Outputs**, como identificador da instância, IP e URL.
+- O bucket S3 do quarto template possui `DeletionPolicy: Retain` e `UpdateReplacePolicy: Retain`, evitando sua remoção automática em operações de exclusão ou substituição da stack.
+- A criação de um usuário e de um grupo IAM não concede permissões por si só. As políticas devem ser adicionadas conforme a necessidade e o princípio do menor privilégio.
+
+A análise detalhada dos ajustes está em [docs/analise-dos-templates.md](docs/analise-dos-templates.md).
+
+## Como criar uma stack no CloudFormation
+
+1. Acesse o Console de Gerenciamento da AWS e selecione a região.
+2. Abra **CloudFormation** e escolha **Create stack**.
+3. Selecione a opção para carregar um template existente.
+4. Envie o arquivo YAML desejado, localizado em `templates/`.
+5. Informe um nome para a stack e preencha os parâmetros.
+6. Revise as configurações e as permissões solicitadas.
+7. Confirme a criação e acompanhe os eventos até a conclusão.
+8. Em caso de falha, consulte os eventos da stack para identificar o recurso e a mensagem de erro.
+
+### Pré-requisitos de implantação
 
 **Templates 01, 02 e 03**
-- Escolha uma VPC e uma subnet pertencente a essa mesma VPC.
+- Uma VPC e uma subnet pertencente a essa VPC.
+- Para o template 03, uma subnet pública com rota para Internet Gateway.
 - A AMI Amazon Linux 2023 é resolvida regionalmente pelo Parameter Store.
-- Para o template 03, a subnet precisa ser pública, com rota para um Internet Gateway. O template associa um IPv4 público à instância.
 
 **Template 04**
-- Escolha uma VPC e uma subnet pública pertencente a ela.
-- Informe um Key Pair existente na mesma região.
-- Informe seu IP público autorizado em formato CIDR, preferencialmente com máscara `/32` (por exemplo, `203.0.113.10/32`; substitua pelo seu IP real).
-- O parâmetro público da Canonical resolve a AMI Ubuntu 24.04 na região selecionada.
-- O usuário e o grupo IAM precisam ter nomes disponíveis na conta.
+- Uma VPC e uma subnet pública pertencente a ela.
+- Um Key Pair existente na mesma região.
+- Um CIDR autorizado para SSH, preferencialmente o IP público atual com máscara `/32`.
+- Nomes disponíveis para o usuário e o grupo IAM.
+- A AMI Ubuntu é consultada dinamicamente no Parameter Store da Canonical.
 
-## Cuidados com custos e segurança
+## Segurança e custos
 
-- Instâncias EC2, volumes EBS, transferência de dados e outros recursos podem gerar custos. Verifique os preços e a elegibilidade do tipo de instância na região antes de criar a stack.
-- Exclua as stacks de laboratório quando terminar, observando as políticas de retenção.
-- O bucket S3 do template 04 tem `DeletionPolicy: Retain` e `UpdateReplacePolicy: Retain`: ele é preservado quando a stack é excluída ou substituída. A exclusão do bucket deve ser avaliada separadamente.
-- O template 04 restringe SSH ao CIDR informado. Não use `0.0.0.0/0` para SSH em um ambiente real.
-- O template 03 libera HTTP publicamente para fins didáticos.
-- Os templates não criam usuários com privilégios administrativos nem associam políticas IAM amplas.
+- Recursos como EC2, volumes EBS, transferência de dados e outros serviços podem gerar cobranças. Consulte os preços e a elegibilidade dos tipos de instância antes da implantação.
+- Não mantenha SSH aberto para `0.0.0.0/0`. Restrinja a origem ao IP ou à rede administrativa necessária.
+- O template 03 libera HTTP publicamente para fins didáticos. Em um ambiente real, avalie HTTPS e controles adicionais.
+- O bucket S3 é configurado para bloquear acesso público e utilizar criptografia padrão.
+- O bucket é retido quando a stack é excluída ou substituída. Sua remoção, se desejada, deve ser tratada separadamente.
+- Exclua recursos de laboratório que não estejam mais em uso, respeitando as políticas de retenção.
 
-## O que foi corrigido e aprendido
+## Aprendizados
 
-Os exemplos foram adaptados para evitar IDs de AMI e identificadores de VPC fixos, nomes de bucket previamente ocupados, placeholders de Key Pair e regras SSH abertas para qualquer origem. Também foram atualizados os comandos de inicialização do Apache para Amazon Linux 2023 e substituído o uso de `SecurityGroups` por `SecurityGroupIds` no template de Firewall.
+O desenvolvimento deste projeto consolidou conceitos essenciais de IaC e infraestrutura AWS: estrutura de templates, parâmetros, referências entre recursos, outputs, UserData, Security Groups, resolução dinâmica de AMIs, IAM e proteção de buckets S3.
 
-O projeto reforça o uso de parâmetros, referências entre recursos, outputs, UserData, Security Groups, IAM, S3, AMIs dinâmicas e boas práticas básicas de segurança.
+Um dos principais aprendizados foi perceber que um template sintaticamente simples pode depender de condições externas para funcionar: região, VPC, subnet, rotas, Key Pair, permissões e disponibilidade de recursos. Por isso, documentar pré-requisitos e limites de segurança faz parte da solução, não é apenas um complemento.
 
-## Validação e escopo
+## Status e validação
 
-Os arquivos deste repositório são templates para estudo e implantação. **A publicação dos arquivos no GitHub não comprova que as stacks foram implantadas em uma conta AWS.** Registre resultados, capturas de tela e eventuais ajustes após executar os templates na sua própria conta. A implantação depende de recursos existentes e parâmetros válidos na região escolhida.
+**Status atual: templates publicados e documentação estruturada; implantação em conta AWS pendente.**
 
-## Referências
+A publicação no GitHub comprova a disponibilidade dos arquivos, mas não comprova a criação bem-sucedida das stacks. A validação prática no CloudFormation, a inspeção dos eventos e a coleta de evidências serão realizadas quando houver uma conta AWS e os recursos de rede necessários.
 
-- [AWS CloudFormation — documentação oficial](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html)
-- [Tipos de parâmetros específicos da AWS no CloudFormation](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cloudformation-supplied-parameter-types.html)
+Não são apresentados resultados de implantação ou capturas de tela como se os templates já tivessem sido executados.
+
+## Referências oficiais
+
+- [AWS CloudFormation — documentação](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html)
+- [Tipos de parâmetros específicos da AWS](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cloudformation-supplied-parameter-types.html)
 - [Amazon Linux 2023 — documentação](https://docs.aws.amazon.com/linux/al2023/ug/what-is-amazon-linux.html)
 - [Canonical — localizar imagens Ubuntu na AWS](https://ubuntu.com/aws/docs/aws-how-to/instances/find-ubuntu-images/)
 - [AWS::EC2::SecurityGroup — referência](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-ec2-securitygroup.html)

@@ -1,0 +1,114 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Cria uma instância EC2 Ubuntu, um Security Group com SSH restrito,
+  um bucket S3 com nome gerado pela AWS e recursos básicos de IAM.
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    Description: Tipo da instância EC2.
+    AllowedValues:
+      - t2.micro
+      - t3.micro
+    ConstraintDescription: Informe t2.micro ou t3.micro.
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: Selecione uma VPC existente na região da implantação.
+
+  PublicSubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Selecione uma subnet pública pertencente à VPC informada.
+
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Nome de um Key Pair EC2 existente na região da implantação.
+
+  SSHLocation:
+    Type: String
+    Description: IP público autorizado a acessar SSH, em formato CIDR (exemplo 203.0.113.10/32).
+    AllowedPattern: '^([0-9]{1,3}\.){3}[0-9]{1,3}/(3[0-2]|[12]?[0-9])$'
+    ConstraintDescription: Informe um endereço IPv4 válido em CIDR, preferencialmente com máscara /32.
+
+  LatestUbuntuAmi:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/noble/stable/current/amd64/hvm/ebs-gp3/ami-id
+    Description: AMI Ubuntu Server 24.04 LTS mais recente, resolvida regionalmente pelo SSM Parameter Store.
+
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  IAMGroup:
+    Type: AWS::IAM::Group
+
+  IAMUser:
+    Type: AWS::IAM::User
+    Properties:
+      Groups:
+        - !Ref IAMGroup
+
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Permite SSH somente a partir do endereço IP autorizado.
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref SSHLocation
+          Description: Acesso SSH restrito ao IP informado no parâmetro SSHLocation.
+
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref LatestUbuntuAmi
+      KeyName: !Ref KeyName
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: '0'
+          SubnetId: !Ref PublicSubnetId
+          GroupSet:
+            - !Ref EC2SecurityGroup
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -eux
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y python3-pip
+
+Outputs:
+  InstanceId:
+    Description: ID da instância EC2 criada.
+    Value: !Ref EC2Instance
+
+  PublicIp:
+    Description: Endereço IPv4 público da instância.
+    Value: !GetAtt EC2Instance.PublicIp
+
+  S3BucketName:
+    Description: Nome exclusivo do bucket S3 criado pela AWS.
+    Value: !Ref S3Bucket
+
+  IAMGroupName:
+    Description: Nome do grupo IAM criado.
+    Value: !Ref IAMGroup
+
+  IAMUserName:
+    Description: Nome do usuário IAM criado.
+    Value: !Ref IAMUser
